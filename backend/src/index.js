@@ -188,4 +188,12 @@ app.listen(PORT, () => {
   console.log(`\n🚀 Portfolio backend running on http://localhost:${PORT}`);
   console.log(`   POST /api/contact  →  contact form endpoint`);
   console.log(`   GET  /             →  health check\n`);
+
+  // Keep Render free tier awake — ping every 10 minutes
+  const BACKEND_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  setInterval(() => {
+    fetch(`${BACKEND_URL}/`)
+      .then(() => console.log('✅ Keep-alive ping sent'))
+      .catch(() => console.log('⚠️ Keep-alive ping failed'));
+  }, 10 * 60 * 1000);
 });
