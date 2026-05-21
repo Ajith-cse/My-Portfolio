@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 
@@ -30,29 +31,7 @@ const contactLimiter = rateLimit({
 });
 
 // ── Nodemailer Transporter ────────────────────────────────────
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: false,
-  requireTLS: true,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
-
-// Verify transporter config on startup
-transporter.verify((error) => {
-  if (error) {
-    console.error('❌ Email transporter error:', error.message);
-    console.error('   → Check your EMAIL_USER and EMAIL_PASS in .env');
-  } else {
-    console.log('✅ Email transporter ready');
-  }
-});
+console.log('✅ Resend email service ready');
 
 // ── Input Validation ─────────────────────────────────────────
 function validateContactInput({ name, email, message }) {
@@ -164,9 +143,22 @@ app.post('/api/contact', contactLimiter, async (req, res) => {
 
   try {
     // Send both emails concurrently
+    const ownerMail = buildOwnerEmail({ name: name.trim(), email: email.trim(), message: message.trim() });
+    const replyMail = buildAutoReplyEmail({ name: name.trim(), email: email.trim() });
+
     await Promise.all([
-      transporter.sendMail(buildOwnerEmail({ name: name.trim(), email: email.trim(), message: message.trim() })),
-      transporter.sendMail(buildAutoReplyEmail({ name: name.trim(), email: email.trim() })),
+      resend.emails.send({
+        from: 'Portfolio Contact <onboarding@resend.dev>',
+        to: process.env.EMAIL_TO,
+        subject: ownerMail.subject,
+        html: ownerMail.html,
+      }),
+      resend.emails.send({
+        from: 'Ajith M <onboarding@resend.dev>',
+        to: email.trim(),
+        subject: replyMail.subject,
+        html: replyMail.html,
+      }),
     ]);
 
     console.log(`📨 Message received from ${name} <${email}>`);
